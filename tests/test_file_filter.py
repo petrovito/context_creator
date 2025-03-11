@@ -55,6 +55,27 @@ def test_is_in_excluded_dir():
         assert not file_filter.is_in_excluded_dir(Path(normal_file))
 
 
+def test_is_excluded_file():
+    """Test checking if a file is in the list of excluded files."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a .gitignore file
+        gitignore_file = os.path.join(temp_dir, ".gitignore")
+        with open(gitignore_file, "w") as f:
+            f.write("*.log\n*.tmp\n")
+        
+        # Create a normal file
+        normal_file = os.path.join(temp_dir, "file.txt")
+        with open(normal_file, "w") as f:
+            f.write("This is a normal file")
+        
+        # Create a FileFilter instance
+        file_filter = FileFilter(temp_dir)
+        
+        # Check if the files are excluded
+        assert file_filter.is_excluded_file(Path(gitignore_file))
+        assert not file_filter.is_excluded_file(Path(normal_file))
+
+
 def test_create_filter():
     """Test creating a filter function."""
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -66,6 +87,11 @@ def test_create_filter():
         git_file = os.path.join(git_dir, "HEAD")
         with open(git_file, "w") as f:
             f.write("ref: refs/heads/main")
+        
+        # Create a .gitignore file
+        gitignore_file = os.path.join(temp_dir, ".gitignore")
+        with open(gitignore_file, "w") as f:
+            f.write("*.log\n*.tmp\n")
         
         # Create a text file
         text_file = os.path.join(temp_dir, "text.txt")
@@ -85,6 +111,7 @@ def test_create_filter():
         assert filter_func(Path(text_file))
         assert not filter_func(Path(binary_file))
         assert not filter_func(Path(git_file))
+        assert not filter_func(Path(gitignore_file))
 
 
 def test_create_filter_with_exclude_patterns():

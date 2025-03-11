@@ -24,6 +24,9 @@ class FileFilter:
     
     # Default directories to exclude
     DEFAULT_EXCLUDE_DIRS = {".git"}
+    
+    # Default files to exclude
+    DEFAULT_EXCLUDE_FILES = {".gitignore"}
 
     def __init__(
         self, 
@@ -97,6 +100,18 @@ class FileFilter:
                 return True
                 
         return False
+        
+    def is_excluded_file(self, path: Path) -> bool:
+        """
+        Check if a file is in the list of excluded files.
+        
+        Args:
+            path: The path to check.
+            
+        Returns:
+            True if the file is excluded, False otherwise.
+        """
+        return path.name in self.DEFAULT_EXCLUDE_FILES
 
     def create_filter(self) -> FilterFunction:
         """
@@ -123,6 +138,10 @@ class FileFilter:
                 
             # Skip files in excluded directories (like .git)
             if self.is_in_excluded_dir(path):
+                return False
+                
+            # Skip excluded files (like .gitignore)
+            if self.is_excluded_file(path):
                 return False
                 
             # Skip files matching exclude patterns
