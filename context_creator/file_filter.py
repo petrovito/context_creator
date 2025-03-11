@@ -22,11 +22,41 @@ class FileFilter:
         ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
     }
     
-    # Default directories to exclude
-    DEFAULT_EXCLUDE_DIRS = {".git"}
+    # Default directories to exclude (only those not typically in .gitignore)
+    DEFAULT_EXCLUDE_DIRS = {".git", ".vscode"}
     
-    # Default files to exclude
-    DEFAULT_EXCLUDE_FILES = {".gitignore"}
+    # Default files to exclude - files that are typically not useful for LLM context
+    # and might not be in standard .gitignore files
+    DEFAULT_EXCLUDE_FILES = {
+        # Version control
+        ".gitignore",  # Explicitly exclude .gitignore since we're using it for filtering
+        
+        # Lock files that might not be gitignored in some projects
+        "Cargo.lock",  # Rust - sometimes committed, sometimes not
+        "package-lock.json",  # npm - sometimes committed
+        "yarn.lock",  # Yarn - sometimes committed
+        "pnpm-lock.yaml",  # pnpm - sometimes committed
+        "composer.lock",  # PHP - sometimes committed
+        "Gemfile.lock",  # Ruby - sometimes committed
+        
+        # Generated files that might not be in .gitignore
+        "*.min.js",  # Minified JavaScript - sometimes committed
+        "*.min.css",  # Minified CSS - sometimes committed
+        "*.map",  # Source maps - sometimes committed
+        
+        # Large generated files that might be committed
+        "yarn-error.log",  # Yarn error logs
+        "npm-debug.log",  # npm debug logs
+        
+        # Configuration files that aren't useful for context
+        ".editorconfig",  # Editor configuration
+        ".prettierrc",  # Prettier configuration
+        ".eslintrc",  # ESLint configuration
+        ".stylelintrc",  # Stylelint configuration
+        "tsconfig.json",  # TypeScript configuration
+        "jsconfig.json",  # JavaScript configuration
+        ".babelrc",  # Babel configuration
+    }
 
     def __init__(
         self, 
@@ -93,7 +123,7 @@ class FileFilter:
         # Convert to absolute path if it's not already
         abs_path = path if path.is_absolute() else (self.root_path / path).resolve()
         
-        # Check if the path is inside a .git directory
+        # Check if the path is inside an excluded directory
         parts = abs_path.parts
         for exclude_dir in self.DEFAULT_EXCLUDE_DIRS:
             if exclude_dir in parts:
@@ -111,7 +141,16 @@ class FileFilter:
         Returns:
             True if the file is excluded, False otherwise.
         """
-        return path.name in self.DEFAULT_EXCLUDE_FILES
+        # Check exact filename matches
+        if path.name in self.DEFAULT_EXCLUDE_FILES:
+            return True
+            
+        # Check pattern matches (for entries with wildcards)
+        for pattern in self.DEFAULT_EXCLUDE_FILES:
+            if "*" in pattern and path.match(pattern):
+                return True
+                
+        return False
 
     def create_filter(self) -> FilterFunction:
         """
