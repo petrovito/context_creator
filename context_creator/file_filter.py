@@ -21,6 +21,9 @@ class FileFilter:
         ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
         ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
     }
+    
+    # Default directories to exclude
+    DEFAULT_EXCLUDE_DIRS = {".git"}
 
     def __init__(
         self, 
@@ -74,6 +77,27 @@ class FileFilter:
         
         return mime_type.startswith("text/")
 
+    def is_in_excluded_dir(self, path: Path) -> bool:
+        """
+        Check if a path is inside an excluded directory.
+
+        Args:
+            path: The path to check.
+
+        Returns:
+            True if the path is inside an excluded directory, False otherwise.
+        """
+        # Convert to absolute path if it's not already
+        abs_path = path if path.is_absolute() else (self.root_path / path).resolve()
+        
+        # Check if the path is inside a .git directory
+        parts = abs_path.parts
+        for exclude_dir in self.DEFAULT_EXCLUDE_DIRS:
+            if exclude_dir in parts:
+                return True
+                
+        return False
+
     def create_filter(self) -> FilterFunction:
         """
         Create a filter function for files.
@@ -95,6 +119,10 @@ class FileFilter:
                 
             # Skip files with binary extensions
             if path.suffix.lower() in self.BINARY_EXTENSIONS:
+                return False
+                
+            # Skip files in excluded directories (like .git)
+            if self.is_in_excluded_dir(path):
                 return False
                 
             # Skip files matching exclude patterns
