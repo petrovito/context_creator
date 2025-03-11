@@ -1,0 +1,9 @@
+.pytest_cache/
+__pycache__/
+.DS_Store
+.idea/
+.vscode/
+.venv/
+
+context_creator.egg-info
+
