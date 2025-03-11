@@ -1,5 +1,6 @@
 """Module for creating context from files."""
 
+import logging
 import os
 from pathlib import Path
 from typing import Iterator, List, Optional
@@ -8,6 +9,9 @@ import pyperclip
 
 from context_creator.file_iterator import FileIterator
 from context_creator.types import FileInfo, FilterFunction, PathLike
+
+# Get logger
+logger = logging.getLogger("context_creator")
 
 
 class ContextCreator:
@@ -28,6 +32,8 @@ class ContextCreator:
             additional_exclude_patterns: Additional patterns to exclude.
         """
         self.root_path = Path(root_dir).resolve()
+        logger.debug(f"Initializing ContextCreator for directory: {self.root_path}")
+        
         self.file_iterator = FileIterator(
             self.root_path,
             file_filter=file_filter,
@@ -48,6 +54,7 @@ class ContextCreator:
         # ```filetype
         # content of file
         # ```
+        logger.debug(f"Formatting file: {file_info.relative_path}")
         return f"{file_info.relative_path}:\n```{file_info.file_type}\n{file_info.content}\n```"
 
     def create_context(self, copy_to_clipboard: bool = True) -> str:
@@ -60,8 +67,14 @@ class ContextCreator:
         Returns:
             The generated context as a string.
         """
+        logger.info(f"Creating context from directory: {self.root_path}")
+        
         # Iterate over files
         file_infos = list(self.file_iterator.iterate_files())
+        logger.info(f"Found {len(file_infos)} files to include in context")
+        
+        for file_info in file_infos:
+            logger.debug(f"Including file: {file_info.relative_path}")
         
         # Sort files by path for consistent output
         file_infos.sort(key=lambda fi: str(fi.relative_path))
@@ -75,6 +88,6 @@ class ContextCreator:
         # Copy to clipboard if requested
         if copy_to_clipboard:
             pyperclip.copy(context)
-            print(f"Context copied to clipboard ({len(context)} characters, {len(file_infos)} files)")
+            logger.info(f"Context copied to clipboard ({len(context)} characters, {len(file_infos)} files)")
         
         return context 

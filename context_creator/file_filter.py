@@ -1,5 +1,6 @@
 """Module for filtering files based on various criteria."""
 
+import logging
 import mimetypes
 import os
 from pathlib import Path
@@ -7,6 +8,9 @@ from typing import List, Set
 
 from context_creator.gitignore_manager import GitignoreManager
 from context_creator.types import FilterFunction, PathLike
+
+# Get logger
+logger = logging.getLogger("context_creator")
 
 
 class FileFilter:
@@ -76,13 +80,18 @@ class FileFilter:
         self.use_gitignore = use_gitignore
         self.exclude_patterns: Set[str] = set()
         
+        logger.debug(f"Initializing FileFilter for directory: {self.root_path}")
+        logger.debug(f"Using gitignore: {self.use_gitignore}")
+        
         # Add additional exclude patterns if provided
         if additional_exclude_patterns:
             self.exclude_patterns.update(additional_exclude_patterns)
+            logger.debug(f"Additional exclude patterns: {self.exclude_patterns}")
         
         # Get the gitignore filter if requested
         self.gitignore_manager = None
         if self.use_gitignore:
+            logger.debug("Creating GitignoreManager")
             self.gitignore_manager = GitignoreManager(self.root_path)
 
     def is_text_file(self, path: Path) -> bool:
@@ -96,6 +105,7 @@ class FileFilter:
             True if the file is a text file, False otherwise.
         """
         if not path.is_file():
+            logger.debug(f"Not a file: {path}")
             return False
 
         mime_type, _ = mimetypes.guess_type(str(path))
@@ -104,11 +114,15 @@ class FileFilter:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     f.read(1024)  # Read a small chunk to check if it's text
+                logger.debug(f"File is text (read test): {path}")
                 return True
             except UnicodeDecodeError:
+                logger.debug(f"File is not text (UnicodeDecodeError): {path}")
                 return False
         
-        return mime_type.startswith("text/")
+        is_text = mime_type.startswith("text/")
+        logger.debug(f"File is {'text' if is_text else 'not text'} (mime type: {mime_type}): {path}")
+        return is_text
 
     def is_in_excluded_dir(self, path: Path) -> bool:
         """
@@ -127,6 +141,7 @@ class FileFilter:
         parts = abs_path.parts
         for exclude_dir in self.DEFAULT_EXCLUDE_DIRS:
             if exclude_dir in parts:
+                logger.debug(f"File is in excluded directory '{exclude_dir}': {path}")
                 return True
                 
         return False
@@ -143,11 +158,13 @@ class FileFilter:
         """
         # Check exact filename matches
         if path.name in self.DEFAULT_EXCLUDE_FILES:
+            logger.debug(f"File is in excluded files list: {path}")
             return True
             
         # Check pattern matches (for entries with wildcards)
         for pattern in self.DEFAULT_EXCLUDE_FILES:
             if "*" in pattern and path.match(pattern):
+                logger.debug(f"File matches excluded pattern '{pattern}': {path}")
                 return True
                 
         return False
@@ -159,6 +176,8 @@ class FileFilter:
         Returns:
             A function that returns True if a file should be included.
         """
+        logger.debug("Creating file filter function")
+        
         # Get the gitignore filter if available
         gitignore_filter = (
             self.gitignore_manager.get_gitignore_filter() 
@@ -169,10 +188,12 @@ class FileFilter:
             """Filter function for files."""
             # Skip directories
             if not path.is_file():
+                logger.debug(f"Skipping directory: {path}")
                 return False
                 
             # Skip files with binary extensions
             if path.suffix.lower() in self.BINARY_EXTENSIONS:
+                logger.debug(f"Skipping binary file (by extension): {path}")
                 return False
                 
             # Skip files in excluded directories (like .git)
@@ -186,13 +207,18 @@ class FileFilter:
             # Skip files matching exclude patterns
             for pattern in self.exclude_patterns:
                 if path.match(pattern):
+                    logger.debug(f"File matches exclude pattern '{pattern}': {path}")
                     return False
                     
             # Apply gitignore filter
             if not gitignore_filter(path):
+                logger.debug(f"File is excluded by gitignore: {path}")
                 return False
                 
             # Check if it's a text file
-            return self.is_text_file(path)
+            is_text = self.is_text_file(path)
+            if not is_text:
+                logger.debug(f"File is not a text file: {path}")
+            return is_text
         
         return file_filter 

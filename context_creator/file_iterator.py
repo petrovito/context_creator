@@ -1,5 +1,6 @@
 """Module for iterating over files in a file tree."""
 
+import logging
 import mimetypes
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional
@@ -7,6 +8,9 @@ from typing import Dict, Iterator, List, Optional
 from context_creator.file_filter import FileFilter
 from context_creator.file_tree_creator import FileTreeCreator
 from context_creator.types import FileInfo, FileTree, FilterFunction, PathLike
+
+# Get logger
+logger = logging.getLogger("context_creator")
 
 
 class FileIterator:
@@ -79,9 +83,11 @@ class FileIterator:
             additional_exclude_patterns: Additional patterns to exclude.
         """
         self.root_path = Path(root_dir).resolve()
+        logger.debug(f"Initializing FileIterator for directory: {self.root_path}")
         
         # Create a file filter if not provided
         if file_filter is None:
+            logger.debug("Creating default file filter")
             filter_manager = FileFilter(
                 self.root_path, 
                 use_gitignore=True,
@@ -89,6 +95,7 @@ class FileIterator:
             )
             self.file_filter = filter_manager.create_filter()
         else:
+            logger.debug("Using provided file filter")
             self.file_filter = file_filter
         
         # Create a file tree creator
@@ -105,7 +112,9 @@ class FileIterator:
             The file type as a string.
         """
         extension = path.suffix.lower()
-        return self.EXTENSION_MAP.get(extension, "text")
+        file_type = self.EXTENSION_MAP.get(extension, "text")
+        logger.debug(f"File type for {path.name}: {file_type}")
+        return file_type
 
     def read_file_content(self, path: Path) -> str:
         """
@@ -117,13 +126,22 @@ class FileIterator:
         Returns:
             The content of the file as a string.
         """
+        logger.debug(f"Reading file content: {path}")
         try:
             with open(path, "r", encoding="utf-8") as f:
-                return f.read()
+                content = f.read()
+                logger.debug(f"Read {len(content)} characters from {path}")
+                return content
         except UnicodeDecodeError:
+            logger.debug(f"UTF-8 decode error for {path}, trying Latin-1")
             # If UTF-8 fails, try with Latin-1 (which can read any byte sequence)
             with open(path, "r", encoding="latin-1") as f:
-                return f.read()
+                content = f.read()
+                logger.debug(f"Read {len(content)} characters from {path} using Latin-1")
+                return content
+        except Exception as e:
+            logger.warning(f"Error reading file {path}: {e}")
+            return f"[Error reading file: {e}]"
 
     def iterate_files(self) -> Iterator[FileInfo]:
         """
@@ -132,18 +150,34 @@ class FileIterator:
         Yields:
             FileInfo objects for each file.
         """
+        logger.debug(f"Iterating over files in {self.root_path}")
+        
         # Create a file tree
         file_tree = self.tree_creator.create_file_tree()
         
+        # Count total files for logging
+        total_files = sum(len(files) for files in file_tree.values())
+        included_files = 0
+        excluded_files = 0
+        
+        logger.debug(f"Found {total_files} total files in the file tree")
+        
         # Iterate over all files in the tree
         for dir_path, files in file_tree.items():
+            logger.debug(f"Processing directory: {dir_path.relative_to(self.root_path) if dir_path != self.root_path else '.'} ({len(files)} files)")
+            
             for file_path in files:
                 # Skip files that don't pass the filter
                 if not self.file_filter(file_path):
+                    excluded_files += 1
+                    logger.debug(f"Excluding file: {file_path.relative_to(self.root_path)}")
                     continue
                     
+                included_files += 1
+                
                 # Get the relative path from the root directory
                 relative_path = file_path.relative_to(self.root_path)
+                logger.debug(f"Including file: {relative_path}")
                 
                 # Read the file content
                 content = self.read_file_content(file_path)
@@ -157,4 +191,6 @@ class FileIterator:
                     relative_path=relative_path,
                     content=content,
                     file_type=file_type,
-                ) 
+                )
+        
+        logger.debug(f"Iteration complete. Included {included_files} files, excluded {excluded_files} files") 
