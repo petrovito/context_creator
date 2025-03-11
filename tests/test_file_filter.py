@@ -3,6 +3,8 @@
 import os
 import tempfile
 from pathlib import Path
+import mimetypes
+from unittest.mock import patch
 
 import pytest
 
@@ -28,6 +30,31 @@ def test_is_text_file():
         # Check if the files are text files
         assert file_filter.is_text_file(Path(text_file))
         assert not file_filter.is_text_file(Path(binary_file))
+
+
+def test_always_text_extensions():
+    """Test that files with extensions in ALWAYS_TEXT_EXTENSIONS are recognized as text files."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create files with extensions that should always be considered text
+        test_extensions = [".rs", ".go", ".ts", ".jsx", ".vue", ".rb", ".php"]
+        test_files = {}
+        
+        for ext in test_extensions:
+            filename = f"test{ext}"
+            file_path = os.path.join(temp_dir, filename)
+            with open(file_path, "w") as f:
+                f.write(f"Content of {filename}")
+            test_files[ext] = file_path
+        
+        # Create a FileFilter instance
+        file_filter = FileFilter(temp_dir)
+        
+        # Test each file with a mocked MIME type that would normally cause it to be rejected
+        for ext, file_path in test_files.items():
+            # Mock the mimetypes.guess_type to return a non-text MIME type
+            with patch('mimetypes.guess_type', return_value=('application/octet-stream', None)):
+                # The file should still be recognized as text because of its extension
+                assert file_filter.is_text_file(Path(file_path)), f"File with extension {ext} should be recognized as text"
 
 
 def test_is_in_excluded_dir():
@@ -185,4 +212,31 @@ def test_create_filter_with_exclude_patterns():
         
         # Check if the files pass the filter
         assert filter_func(Path(text_file)), "Text file should pass the filter"
-        assert not filter_func(Path(log_file)), "Log file should not pass the filter" 
+        assert not filter_func(Path(log_file)), "Log file should not pass the filter"
+
+
+def test_create_filter_with_always_text_extensions():
+    """Test that the filter function correctly handles files with extensions in ALWAYS_TEXT_EXTENSIONS."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create files with extensions that should always be considered text
+        rust_file = os.path.join(temp_dir, "main.rs")
+        go_file = os.path.join(temp_dir, "server.go")
+        typescript_file = os.path.join(temp_dir, "app.ts")
+        
+        with open(rust_file, "w") as f:
+            f.write("fn main() { println!(\"Hello, world!\"); }")
+        with open(go_file, "w") as f:
+            f.write("package main\n\nfunc main() { fmt.Println(\"Hello, world!\") }")
+        with open(typescript_file, "w") as f:
+            f.write("console.log('Hello, world!');")
+        
+        # Create a FileFilter instance
+        file_filter = FileFilter(temp_dir)
+        filter_func = file_filter.create_filter()
+        
+        # Mock the mimetypes.guess_type to return a non-text MIME type
+        with patch('mimetypes.guess_type', return_value=('application/octet-stream', None)):
+            # The files should still pass the filter because of their extensions
+            assert filter_func(Path(rust_file)), "Rust file should pass the filter"
+            assert filter_func(Path(go_file)), "Go file should pass the filter"
+            assert filter_func(Path(typescript_file)), "TypeScript file should pass the filter" 

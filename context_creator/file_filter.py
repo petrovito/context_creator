@@ -61,6 +61,34 @@ class FileFilter:
         "jsconfig.json",  # JavaScript configuration
         ".babelrc",  # Babel configuration
     }
+    
+    # Extensions that should always be considered text files
+    # regardless of their MIME type
+    ALWAYS_TEXT_EXTENSIONS = {
+        ".rs",    # Rust
+        ".go",    # Go
+        ".ts",    # TypeScript
+        ".tsx",   # TypeScript JSX
+        ".jsx",   # JSX
+        ".vue",   # Vue
+        ".svelte", # Svelte
+        ".kt",    # Kotlin
+        ".kts",   # Kotlin Script
+        ".swift", # Swift
+        ".scala", # Scala
+        ".elm",   # Elm
+        ".hs",    # Haskell
+        ".rb",    # Ruby
+        ".php",   # PHP
+        ".pl",    # Perl
+        ".ex",    # Elixir
+        ".exs",   # Elixir Script
+        ".erl",   # Erlang
+        ".hrl",   # Erlang Header
+        ".clj",   # Clojure
+        ".fs",    # F#
+        ".fsx",   # F# Script
+    }
 
     def __init__(
         self, 
@@ -107,6 +135,11 @@ class FileFilter:
         if not path.is_file():
             logger.debug(f"Not a file: {path}")
             return False
+            
+        # Check if the file extension is in our list of always-text extensions
+        if path.suffix.lower() in self.ALWAYS_TEXT_EXTENSIONS:
+            logger.debug(f"File is text (by extension override): {path}")
+            return True
 
         mime_type, _ = mimetypes.guess_type(str(path))
         if mime_type is None:
